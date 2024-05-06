@@ -1,0 +1,1 @@
+package com.vn.osp.notarialservices.district.reposistory;
