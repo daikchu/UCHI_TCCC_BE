@@ -1,11 +1,15 @@
 package com.vn.osp.notarialservices.utils;
 
-import com.vn.osp.notarialservices.citizenVerificationOrder.dto.CitizenVerifyOrderDTO;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.osp.notarialservices.common.util.PagingResult;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.UnsupportedEncodingException;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.net.URLEncoder;
+import java.util.HashMap;
 import java.util.Map;
 
 public class OspQueryFactory {
@@ -121,6 +125,78 @@ public class OspQueryFactory {
 
         String url = Constants.OSP_API_LINK + "/citizen-verifications/export-data-for-notary-office-side?1=1"+urlParams.toString();
         return APIUtil.getReturnMap(url);
+    }
+
+    public static Map sendFileAuthenFaceId(String token, File file, String verifyId, String notary_office_id, String cccd_number) {
+        Map result = new HashMap();
+        try {
+            String url = Constants.OSP_API_LINK + "/citizen-verifications/upload-verify-file";
+            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "multipart/form-data");
+            conn.setRequestProperty("Authorization", token);
+
+            // Create the multipart request body
+            OutputStream os = conn.getOutputStream();
+            PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, "UTF-8"), true);
+
+            // Write parameters to the body
+            writer.append("--BoundaryString\r\n");
+            writer.append("Content-Disposition: form-data; name=\"verifyId\"\r\n\r\n");
+            writer.append(verifyId + "\r\n");
+            writer.append("--BoundaryString\r\n");
+            writer.append("Content-Disposition: form-data; name=\"notary_office_id\"\r\n\r\n");
+            writer.append(notary_office_id + "\r\n");
+            writer.append("--BoundaryString\r\n");
+            writer.append("Content-Disposition: form-data; name=\"cccd_number\"\r\n\r\n");
+            writer.append(cccd_number + "\r\n");
+
+            // Write file content to the body
+            writer.append("--BoundaryString\r\n");
+            writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"\r\n");
+            writer.append("Content-Type: application/octet-stream\r\n\r\n");
+            writer.flush();
+
+            FileInputStream fis = new FileInputStream(file);
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+            }
+
+            os.flush();
+            fis.close();
+
+            // Add closing boundary
+            writer.append("\r\n--BoundaryString--\r\n");
+            writer.close();
+
+            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                throw new RuntimeException("Failed : HTTP error code : " + conn.getResponseCode());
+            }
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder response = new StringBuilder();
+            String output;
+            while ((output = br.readLine()) != null) {
+                response.append(output);
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            while ((output = br.readLine()) != null) {
+                result = mapper.readValue(output, Map.class);
+            }
+
+            conn.disconnect();
+            return result;
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /**END Citizen Verifìcation*/

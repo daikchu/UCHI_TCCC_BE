@@ -1,26 +1,29 @@
 package com.vn.osp.notarialservices.citizenVerification.controller;
 
 
+import com.vn.osp.notarialservices.auth.ApiResponse;
+import com.vn.osp.notarialservices.citizenVerification.dto.CitizenVerificationsDTO;
 import com.vn.osp.notarialservices.citizenVerification.service.CitizenVerficationService;
 import com.vn.osp.notarialservices.common.exception.BadRequestException;
 import com.vn.osp.notarialservices.common.util.PagingResult;
 import com.vn.osp.notarialservices.systemmanager.service.AccessHistoryService;
 import com.vn.osp.notarialservices.utils.OspQueryFactory;
+import com.vn.osp.notarialservices.utils.TimeUtil;
 import net.sf.jett.transform.ExcelTransformer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
@@ -117,5 +120,46 @@ public class CitizenVerificationController {
         } catch(Exception e){
             e.printStackTrace();
         }
+    }
+
+    @RequestMapping(value = "/save-file-verify",method = RequestMethod.POST)
+    public ResponseEntity<Object> saveFileVerify(@RequestHeader(value = "Authorization") String authorization, @RequestBody final CitizenVerificationsDTO citizenInformationDTO, HttpServletRequest request){
+        File file = getFileJustAuthen();
+        if(file != null) {
+            String fileUrlToView = "";
+            Map map = OspQueryFactory.sendFileAuthenFaceId(authorization, file, citizenInformationDTO.getVerify_id(), citizenInformationDTO.getNotary_office_id(), citizenInformationDTO.getCitizen_verify_cccd());
+            return new ResponseEntity<>(new ApiResponse(true, "upload file authen successfully", fileUrlToView), HttpStatus.UNAUTHORIZED);
+        } else {
+            return new ResponseEntity<>(new ApiResponse(true, "there is no file", null), HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private File getFileJustAuthen() {
+        String filePath = systemConfigService.getConfigValue("faceId_file_path").orElse(null);
+        String today = TimeUtil.toYearMonthDay(new Date());
+        String fullFileUrl = filePath + "/" + today + "/PDF";
+
+        // Create a File object for the folder
+        File folder = new File(fullFileUrl);
+
+        if (folder.isDirectory()) {
+            // List all files in the folder
+            File[] files = folder.listFiles();
+
+            // Sort the files based on last modified timestamp
+            Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
+
+            if (files.length > 0) {
+                // Get the newest file
+                File newestFile = files[0];
+                System.out.println("Newest file: " + newestFile.getName());
+                return newestFile;
+            } else {
+                System.out.println("Folder is empty.");
+            }
+        } else {
+            System.out.println("Invalid folder path.");
+        }
+        return null;
     }
 }

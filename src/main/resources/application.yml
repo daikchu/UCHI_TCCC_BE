@@ -5,7 +5,7 @@ spring:
     default-domain: apitccc
   datasource:
     driverClassName: com.mysql.jdbc.Driver
-    url: jdbc:mysql://${db.hostname}:${db.port}/${db.schema}?autoReconnect=true&useSSL=false&zeroDateTimeBehavior=convertToNull
+    url: jdbc:mysql://${db.hostname}:${db.port}/${db.schema}?allowPublicKeyRetrieval=true&useSSL=false
     username: ${db.username}
     password: ${db.password}
     initial-size: 100
